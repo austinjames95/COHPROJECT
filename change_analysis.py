@@ -11,7 +11,7 @@ from matplotlib.patches import Circle
 from scipy import ndimage
 from skimage.measure import label, regionprops
 
-# ---------------- Interactive change viewer with hotspots ----------------
+
 def interactive_change_viewer(curr_pet_volume, prev_pet_volume, structure_masks, structures,
                               init_mode="absolute"):
     """

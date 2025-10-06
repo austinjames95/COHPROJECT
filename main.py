@@ -106,8 +106,7 @@ print(f"\n✅ Using RTSTRUCT with UID={selected_uid}")
 print(f"  -> CT slices: {len(matched_ct)}")
 print(f"  -> PET slices: {len(matched_pet)}")
 
-# Continue processing
-#process_dvh(rd_dataset, rs_dataset, False)
+process_dvh(rd_dataset, rs_dataset, False)
 curr_pet_volume, curr_masks, curr_structs = process_pvh(matched_ct, matched_pet, rd_dataset, reg_dataset, rs_dataset)
 if given_dvh_dir is not None:
     compare_relative_dvh()

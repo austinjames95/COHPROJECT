@@ -6,6 +6,9 @@ The program was written in python 3.10.11, please run the following commands to 
 venv\Scripts\activate.bat
 
 After the virtual eviroment is created and activated run the .bat file found in the repo, there will be libraries installed in both conda and pip as there are compatibility issues with some libraries on conda.
+
+\install_packages.bat
+
 If the bat file does not work, just install all of the libraries that are listed inside of the bat file.
 
 ---

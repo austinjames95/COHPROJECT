@@ -1,7 +1,6 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
-import re
 import numpy as np
 from config import given_pvh_dir, given_dvh_dir
 

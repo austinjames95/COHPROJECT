@@ -1,11 +1,15 @@
 # Instillation Instructions:
 ---
-The program was written in python 3.10.18, this version is not avaliable on [python.com/downloads](https://www.python.org/downloads/), to install this version you must create a virtual enviroment (preferably in conda) with the following command
+The program was written in python 3.10.11, please run the following commands to run this program
 
-## conda create -n venv python=3.10.18
-## conda activate venv
+## python3 -m venv venv
+venv\Scripts\activate.bat
 
 After the virtual eviroment is created and activated run the .bat file found in the repo, there will be libraries installed in both conda and pip as there are compatibility issues with some libraries on conda.
+
+\install_packages.bat
+
+If the bat file does not work, just install all of the libraries that are listed inside of the bat file.
 
 ---
 # Setup Instructions 

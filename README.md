@@ -9,4 +9,6 @@ After the virtual eviroment is created and activated run the .bat file found in 
 
 ---
 # Setup Instructions 
+---
+This program is designed to compare different timepoints of the same patient, in this program we just call these entirely different patients (i.e. Patient1 and Patient2). Simply export patient data to each respective Patient in the Input folder. 
 

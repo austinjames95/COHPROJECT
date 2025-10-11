@@ -1,3 +1,8 @@
+# Add lib folder to path
+lib_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib')
+if lib_path not in sys.path:
+    sys.path.insert(0, lib_path)
+
 from ddvh2cdvh import compare_relative_dvh, compare_relative_pvh, plot_dvh_and_pvh_differences
 from helper.load_dicom import read_dicom
 from processing.pvh import process_pvh, ask_choice

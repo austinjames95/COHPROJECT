@@ -1,3 +1,5 @@
+import os
+import sys
 # Add lib folder to path
 lib_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib')
 if lib_path not in sys.path:

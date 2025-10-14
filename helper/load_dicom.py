@@ -4,6 +4,8 @@ import os
 from config import elastix_file
 from collections import defaultdict
 from helper.resample import Volume, parse_rt_registration
+from tkinter import filedialog
+import tkinter as tk
 
 """ 
 Loads all of the DICOM Data and returns them as 
@@ -132,3 +134,51 @@ def read_dicom(patientFold):
         ct_datasets = [ds for s in ct_series.values() for ds in s]
         
     return ct_datasets, pet_datasets, rs_datasets, rd_dataset, reg_dataset
+
+def browse_root_directory():
+    """
+    Opens a dialog to select root directory containing patient data.
+    Returns the selected path or None if cancelled.
+    """
+    root = tk.Tk()
+    root.withdraw()
+    
+    directory = filedialog.askdirectory(
+        title="Select Root Directory Containing Patient Data",
+        initialdir=os.path.dirname(os.path.abspath(__file__))
+    )
+    
+    root.destroy()
+    return directory if directory else None
+
+def has_dicom_files(directory, max_depth=3): # note there should only be a depth of 4 files the program is looking through, input->patient(x)->ct/pet tp
+    """
+    Checks if directory contains DICOM files (searches up to max_depth subdirectories).
+    """
+    if not os.path.exists(directory):
+        return False
+    
+    def recur_dir(path, depth=0):
+        if depth > max_depth:
+            return False
+        
+        try:
+            for item in os.listdir(path):
+                item_path = os.path.join(path, item)
+                
+                if os.path.isfile(item_path):
+                    try:
+                        ds = pydicom.dcmread(item_path, stop_before_pixels=True)
+                        if hasattr(ds, 'Modality'):
+                            return True
+                    except:
+                        continue
+                elif os.path.isdir(item_path) and depth < max_depth:
+                    if recur_dir(item_path, depth + 1):
+                        return True
+        except Exception:
+            return False
+        
+        return False
+    
+    return recur_dir(directory)

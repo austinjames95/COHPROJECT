@@ -404,7 +404,7 @@ def main():
     curr_pet_volume, curr_masks, curr_structs = process_pvh(
         matched_ct, matched_pet, rd_dataset, reg_dataset, rs_dataset
     )
-    
+
     # Check for pre-existing comparison data
     if given_dvh_dir is not None or given_pvh_dir is not None:  
         if given_dvh_dir is not None:
@@ -444,6 +444,7 @@ def main():
                 if rs2_dataset is None:
                     print("[Compare] Skipping timepoint comparison due to RTSTRUCT selection error.")
                 else:
+                    process_dvh(rd2, rs2_dataset, True)
                     prev_pet_volume, prev_masks, prev_structs = process_pvh(
                         matched_ct2, matched_pet2, rd2, reg2, rs2_dataset, True
                     )
@@ -461,6 +462,15 @@ def main():
     print("ANALYSIS COMPLETE")
     print("="*80)
 
+def plotting_comparison():
+    compare_timepoints_interactive(
+        "generated_data",
+        "generated_data2",
+        curr_pet_volume=None,
+        structure_masks=None,
+        structures=None,
+        prev_pet_volume=None)
 
 if __name__ == "__main__":
     main()
+    plotting_comparison()

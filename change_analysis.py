@@ -247,10 +247,11 @@ def mean_dose_drop(df, output_dir, generated_data_dir='generated_data', generate
     s = df.dropna(subset=['Mean_Dose_Gy', metric_y]).copy()
 
     max_dose_threshold = 2.5
-
-    if max_dose_threshold is not None:
+    min_dose_threshold = 2
+    if max_dose_threshold is not None and min_dose_threshold is not None:
         n_before = len(s)
         s = s[s['Mean_Dose_Gy'] <= max_dose_threshold].copy()
+        
         n_after = len(s)
         print(f"Filtered to doses ≤ {max_dose_threshold} Gy: {n_before} → {n_after} structures")
     

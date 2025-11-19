@@ -219,7 +219,11 @@ def load_timepoint_data(patient_dir, timepoint_info, timepoint_label):
     
     # Load data from timepoint's own folder(s)
     for folder in timepoint_info['folders']:
-        folder_path = os.path.join(patient_dir, folder)
+        # Handle 'ROOT' as a special case - files are directly in patient_dir
+        if folder == 'ROOT':
+            folder_path = patient_dir
+        else:
+            folder_path = os.path.join(patient_dir, folder)
         print(f"\nScanning: {folder_path}")
         
         ct, pet, rs, rd, reg = read_dicom(folder_path)
@@ -236,7 +240,12 @@ def load_timepoint_data(patient_dir, timepoint_info, timepoint_label):
     # If no CT found but reference CT folder specified, load CT from there
     if not all_ct_datasets and timepoint_info.get('reference_ct_folder'):
         ref_folder = timepoint_info['reference_ct_folder']
-        ref_path = os.path.join(patient_dir, ref_folder)
+        
+        # Handle 'ROOT' as a special case
+        if ref_folder == 'ROOT':
+            ref_path = patient_dir
+        else:
+            ref_path = os.path.join(patient_dir, ref_folder)
         
         print(f"\n⚠️  No CT in current timepoint. Loading CT from reference: {ref_folder}")
         
@@ -473,4 +482,4 @@ def plotting_comparison():
 
 if __name__ == "__main__":
     main()
-    plotting_comparison()
+    #plotting_comparison()

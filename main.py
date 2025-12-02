@@ -286,7 +286,7 @@ def select_rtstruct(rs_datasets, ct_datasets, pet_datasets, patient_label="Patie
         return None, None, None, None
     
     if len(valid_rs_options) == 1:
-        print(f"ℹOnly one RTSTRUCT available for {patient_label}, using it.")
+        print(f"Only one RTSTRUCT available for {patient_label}, using it.")
         selected = 0
     else:
         selected = choose_rtstruct_gui(valid_rs_options, valid_rs_options_print)

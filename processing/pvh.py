@@ -1,6 +1,7 @@
 from dicompylercore import dicomparser, dvhcalc
 import matplotlib.pyplot as plt
 import numpy as np
+from processing.plotting import plot_pvh
 import csv
 from datetime import datetime
 import os
@@ -140,7 +141,7 @@ def choose_structure_gui(struct_list):
         messagebox.showerror("Invalid Input", "Please enter a number.")
         return choose_structure_gui(struct_list)
 
-def interactive_structure_viewer(pet_volume, structure_masks, structures, secondPatient):
+def interactive_structure_viewer(pet_volume, structure_masks, structures, secondTimePoint):
     if not structure_masks:
         print("No structures found to display.")
         return
@@ -224,7 +225,7 @@ def interactive_structure_viewer(pet_volume, structure_masks, structures, second
         z = int(slice_slider.val)
         if event.key == 's':
             z = int(slice_slider.val)
-            if secondPatient is False:
+            if secondTimePoint is False:
                 filename = f"generated_data/Images/Slice_{z:03d}_Multi.png"
                 os.makedirs("generated_data/Images", exist_ok=True)
             else:
@@ -377,42 +378,15 @@ def create_basic_structure_masks(structures, rs_dataset, ct_datasets, volume_sha
         masks[sid] = mask
     return masks
 
-def get_pet_resolution_basic(pet_volume):
+def get_pet_resolution_basic(pet_volume): #wip
     max_pet = np.max(pet_volume)
     min_pet = np.min(pet_volume)
     data_range = max_pet - min_pet
     pet_step = data_range / 1000.0 if data_range > 0 else 1.0
     return pet_step, max_pet
 
-def plot_pvh(pvh_table_absolute, pvh_table_relative, secondPatient):
-    num_structures = len([k for k in pvh_table_absolute.keys() if k != 'BQML'])
-    colors = plt.cm.tab10(np.linspace(0, 1, num_structures)) if num_structures <= 10 else plt.cm.tab20(np.linspace(0, 1, min(num_structures, 20)))
-
-    pet_values = pvh_table_absolute["BQML"]
-    plt.figure(figsize=(12, 8))
-    for i, (struct_name, volumes) in enumerate(pvh_table_relative.items()):
-        if struct_name == "BQML":
-            continue
-        clean_name = struct_name.replace("_RelativeCumVolume", "").replace("_", " ")
-        plt.plot(pvh_table_relative["BQML"], volumes, label=clean_name, linewidth=2, color=colors[i % len(colors)])
-
-    plt.xlabel('PET Activity (Bq/mL)')
-    plt.ylabel('Relative Volume (fraction)')
-    plt.title('Cumulative PVH - Relative Volumes')
-    plt.grid(True, alpha=0.3)
-    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.tight_layout()
-    
-    if secondPatient is False:
-        os.makedirs("generated_data/PVH", exist_ok=True)
-        plt.savefig("generated_data/PVH/PVH_Relative_Plot.png", dpi=300, bbox_inches='tight')
-    else:
-        os.makedirs("generated_data2/PVH", exist_ok=True)
-        plt.savefig("generated_data2/PVH/PVH_Relative_Plot.png", dpi=300, bbox_inches='tight')
-
-    print("Relative PVH plot saved.")
-
 def export_csv(relative_path, pvh_table_relative, custom_bins):
+    os.makedirs(os.path.dirname(relative_path), exist_ok=True)
     with open(relative_path, 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(list(pvh_table_relative.keys()))
@@ -421,6 +395,7 @@ def export_csv(relative_path, pvh_table_relative, custom_bins):
             writer.writerow(row)
 
 def export_csv_suv(relative_path, suv_data):
+    os.makedirs(os.path.dirname(relative_path), exist_ok=True)
     with open(relative_path, 'w', newline='') as f:
         writer = csv.writer(f)
         # Write header
@@ -437,7 +412,7 @@ def export_csv_suv(relative_path, suv_data):
                 f"{entry['integral']:.3f}"
             ])
 
-def process_pvh(ct_datasets, pet_datasets, rd_dataset, reg_dataset, rs_dataset, secondPatient=False):
+def process_pvh(ct_datasets, pet_datasets, rd_dataset, reg_dataset, rs_dataset, secondTimePoint=False):
     if not pet_datasets:
         print("\nNo PET data found - skipping PET visualization")
         return
@@ -580,13 +555,20 @@ def process_pvh(ct_datasets, pet_datasets, rd_dataset, reg_dataset, rs_dataset, 
     voxel_volume_ml = voxel_volume_mm3 / 1000.0
     print(f"Voxel spacing (mm): {spacing}, thickness (mm): {thickness}, voxel volume: {voxel_volume_ml:.3f} mL")
 
-    pet_step, max_pet = get_pet_resolution_basic(resampled_pet_volume)
-    estimated_bins = int(max_pet / pet_step) + 1
-    if estimated_bins > 10000:
-        print(f"Too many bins ({estimated_bins}), adjusting...")
-        pet_step = max_pet / 10000.0
+    from pet_step import CUSTOM_STEP, CUSTOM_PET_STEP
 
-    custom_bins = np.arange(0, max_pet + pet_step, pet_step)
+    pet_step, max_pet = get_pet_resolution_basic(resampled_pet_volume)
+    if CUSTOM_STEP == False:
+        estimated_bins = int(max_pet / pet_step) + 1
+        if estimated_bins > 10000:
+            print(f"Too many bins ({estimated_bins}), adjusting...")
+            pet_step = max_pet / 10000.0
+    else:
+        pet_step = CUSTOM_PET_STEP
+    print(f"PET STEP: {pet_step}")
+    
+
+    custom_bins = np.arange(0, max_pet + pet_step, pet_step) # change to whatever val (ex max  = 27000) - create 5-10k fixed bins (in every patient)
     pvh_table_absolute = {"BQML": custom_bins.tolist()}
     pvh_table_relative = {"BQML": custom_bins.tolist()}
 
@@ -624,7 +606,6 @@ def process_pvh(ct_datasets, pet_datasets, rd_dataset, reg_dataset, rs_dataset, 
         pvh_table_relative[f"{safe_name}_RelativeCumVolume"] = relative_volumes
 
         suv_data.append({
-
             "id": sid,
             "name": name,
             "voxels": total_voxels,
@@ -660,7 +641,7 @@ def process_pvh(ct_datasets, pet_datasets, rd_dataset, reg_dataset, rs_dataset, 
                         z_positions.append(float(ds.ImagePositionPatient[2]))
             
             voxel_spacing_mm = [spacing[0], spacing[1], thickness]
-            print(f"Voxel spacing: {voxel_spacing_mm} mm")
+            print(f"Voxel spacing: {spacing[0]} mm, {spacing[1]} mm, {thickness} mm")
             
             # Generate structures for ALL structures
             all_generated_structures = {}
@@ -677,7 +658,8 @@ def process_pvh(ct_datasets, pet_datasets, rd_dataset, reg_dataset, rs_dataset, 
                         struct_name,         # Current reference structure name
                         voxel_volume_ml,     # Voxel volume in mL
                         voxel_spacing_mm,     # Voxel spacing in mm
-                        secondPatient
+                        secondTimePoint,
+                        write_to_dicom=False  # Don't write individual files in loop
                     )
                     
                     if generated_structures:
@@ -695,6 +677,35 @@ def process_pvh(ct_datasets, pet_datasets, rd_dataset, reg_dataset, rs_dataset, 
             
             if all_generated_structures:
                 print(f"✅ Successfully generated {len(all_generated_structures)} new structures total")
+                
+                # CRITICAL FIX: Write ALL generated structures to DICOM file
+                if ct_datasets and len(ct_datasets) > 0:
+                    try:
+                        from helper.new_mask import write_structures_to_rt
+                        
+                        # Determine output directory based on secondTimePoint
+                        if secondTimePoint is False:
+                            output_dir = "generated_data/PET_Structures"
+                        else:
+                            output_dir = "generated_data2/PET_Structures"
+                        
+                        os.makedirs(output_dir, exist_ok=True)
+                        output_rs_path = os.path.join(output_dir, "Generated_PET_Structures.dcm")
+                        
+                        print(f"\nWriting ALL {len(all_generated_structures)} structures to RT Structure Set...")
+                        write_structures_to_rt(
+                            ct_datasets, all_generated_structures, 
+                            output_rs_path
+                        )
+                        
+                        print(f"✅ Generated RT Structure Set with ALL structures saved to: {output_rs_path}")
+                        
+                    except Exception as write_error:
+                        print(f"⚠️ Warning: Could not write RT Structure Set: {write_error}")
+                        import traceback
+                        traceback.print_exc()
+                else:
+                    print("⚠️ No CT datasets available - skipping RT Structure Set creation")
                 
                 # Optionally, add generated structures to the PVH analysis
                 include_in_pvh = ask_choice("Do you want to include generated structures in PVH analysis?")
@@ -777,7 +788,7 @@ def process_pvh(ct_datasets, pet_datasets, rd_dataset, reg_dataset, rs_dataset, 
                         z_positions.append(float(ds.ImagePositionPatient[2]))
             
             voxel_spacing_mm = [spacing[0], spacing[1], thickness]
-            print(f"Voxel spacing: {voxel_spacing_mm} mm")
+            print(f"Voxel spacing: {spacing[0]} mm, {spacing[1]} mm, {thickness} mm")
             
             # Generate structures
             try:
@@ -789,7 +800,7 @@ def process_pvh(ct_datasets, pet_datasets, rd_dataset, reg_dataset, rs_dataset, 
                     reference_structure, # Selected reference structure name
                     voxel_volume_ml,     # Voxel volume in mL
                     voxel_spacing_mm,     # Voxel spacing in mm
-                    secondPatient
+                    secondTimePoint
                 )
                 
                 if generated_structures:
@@ -868,8 +879,11 @@ def process_pvh(ct_datasets, pet_datasets, rd_dataset, reg_dataset, rs_dataset, 
             print(f"Error in structure generation: {e}")
             import traceback
             traceback.print_exc()
-    
-    if secondPatient is False:
+
+    output_dir = None
+    suv_output_dir = None
+
+    if secondTimePoint is False:
         output_dir = "generated_data/PVH"
         suv_output_dir = "generated_data/SUV_Data"
     else:
@@ -881,6 +895,7 @@ def process_pvh(ct_datasets, pet_datasets, rd_dataset, reg_dataset, rs_dataset, 
     # Export CSV files
     relative_path = os.path.join(output_dir, "CumulativePVH_AllStructures_RelativeUnits.csv")
     export_csv(relative_path, pvh_table_relative, custom_bins)
+    print("EXPORTED PVH TEST")
     
     os.makedirs(suv_output_dir, exist_ok=True)
 
@@ -893,6 +908,6 @@ def process_pvh(ct_datasets, pet_datasets, rd_dataset, reg_dataset, rs_dataset, 
     
     # Generate plots and interactive viewer
     print("\nGenerating PVH plots...")
-    plot_pvh(pvh_table_absolute, pvh_table_relative, secondPatient)
-    interactive_structure_viewer(resampled_pet_volume, structure_masks, structures, secondPatient)
+    plot_pvh(pvh_table_absolute, pvh_table_relative, secondTimePoint)
+    interactive_structure_viewer(resampled_pet_volume, structure_masks, structures, secondTimePoint)
     return resampled_pet_volume, structure_masks, structures

@@ -200,40 +200,57 @@ def mean_dose_drop(df, output_dir, generated_data_dir='generated_data', generate
 
     # Load mean dose data from both DVH folders
     mean_doses = {}
-    
+
+    def _find_mean_column(df):
+        """Find the mean dose column in DVH stats CSV."""
+        for col in df.columns:
+            lc = col.lower()
+            if 'mean' in lc and 'gy' in lc:
+                return col
+        for col in df.columns:
+            if 'mean' in col.lower():
+                return col
+        return None
+
     # Load from generated_data/DVH
     dvh_stats_path1 = os.path.join(generated_data_dir, 'DVH', 'DVH_Structure_Statistics.csv')
     if os.path.exists(dvh_stats_path1):
         try:
             dvh_df1 = pd.read_csv(dvh_stats_path1)
-            if 'Structure' in dvh_df1.columns and 'Mean Dose (Gy)' in dvh_df1.columns:
+            mean_col = _find_mean_column(dvh_df1)
+            struct_col = 'Structure' if 'Structure' in dvh_df1.columns else dvh_df1.columns[0]
+            if mean_col is not None:
                 for _, row in dvh_df1.iterrows():
-                    structure = row['Structure']
-                    mean_dose = row['Mean Dose (Gy)']
-                    mean_doses[structure] = mean_dose
-                print(f"Loaded {len(dvh_df1)} structures from {dvh_stats_path1}")
+                    structure = row.get(struct_col)
+                    mean_dose = pd.to_numeric(row.get(mean_col), errors='coerce')
+                    if pd.notna(mean_dose) and structure is not None:
+                        mean_doses[str(structure).strip()] = float(mean_dose)
+                print(f"[Mean Dose] Loaded {len(dvh_df1)} structures (mean col='{mean_col}') from {dvh_stats_path1}")
         except Exception as e:
-            print(f"Error loading DVH stats from {dvh_stats_path1}: {e}")
-    
+            print(f"[Mean Dose] Error loading DVH stats from {dvh_stats_path1}: {e}")
+
     # Load from generated_data2/DVH (this will be the "previous" scan data)
     dvh_stats_path2 = os.path.join(generated_data2_dir, 'DVH', 'DVH_Structure_Statistics.csv')
     if os.path.exists(dvh_stats_path2):
         try:
             dvh_df2 = pd.read_csv(dvh_stats_path2)
-            if 'Structure' in dvh_df2.columns and 'Mean Dose (Gy)' in dvh_df2.columns:
-                # Store as previous mean dose
+            mean_col2 = _find_mean_column(dvh_df2)
+            struct_col2 = 'Structure' if 'Structure' in dvh_df2.columns else dvh_df2.columns[0]
+            if mean_col2 is not None:
+                # Store as previous mean dose (average with existing if present)
                 for _, row in dvh_df2.iterrows():
-                    structure = row['Structure']
-                    mean_dose_prev = row['Mean Dose (Gy)']
-                    # If structure already has current dose, calculate average
-                    if structure in mean_doses:
-                        # Average of current and previous
-                        mean_doses[structure] = (mean_doses[structure] + mean_dose_prev) / 2
-                    else:
-                        mean_doses[structure] = mean_dose_prev
-                print(f"Loaded {len(dvh_df2)} structures from {dvh_stats_path2}")
+                    structure = row.get(struct_col2)
+                    mean_dose_prev = pd.to_numeric(row.get(mean_col2), errors='coerce')
+                    if pd.notna(mean_dose_prev) and structure is not None:
+                        structure = str(structure).strip()
+                        if structure in mean_doses:
+                            # Average of current and previous
+                            mean_doses[structure] = (mean_doses[structure] + float(mean_dose_prev)) / 2.0
+                        else:
+                            mean_doses[structure] = float(mean_dose_prev)
+                print(f"[Mean Dose] Loaded {len(dvh_df2)} structures (mean col='{mean_col2}') from {dvh_stats_path2}")
         except Exception as e:
-            print(f"Error loading DVH stats from {dvh_stats_path2}: {e}")
+            print(f"[Mean Dose] Error loading DVH stats from {dvh_stats_path2}: {e}")
     
     if not mean_doses:
         print("No mean dose data found in DVH folders")

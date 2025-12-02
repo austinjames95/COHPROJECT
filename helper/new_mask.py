@@ -486,27 +486,64 @@ def generate_pet_based_structures(suv_volume, structure_masks, structures,
     
     new_structures = {}
     
-    # 1. Create SUV threshold structures
-    print("\n=== Creating SUV Threshold Structures ===")
-    threshold_structures = create_multiple_threshold_structures(
-        working_suv_volume, working_reference_mask, 
-        thresholds=[90, 70, 50, 30],
-        voxel_volume_ml=voxel_volume_ml
-    )
+    # 1. Create activity-based threshold structures (5000 Bq·mL steps)
+    print("\n=== Creating Activity-Based Threshold Structures ===")
     
-    # Colors for threshold structures (from red to yellow)
-    threshold_colors = {
-        90: [255, 0, 0],    # Red
-        70: [255, 128, 0],  # Orange
-        50: [255, 255, 0],  # Yellow
-        30: [255, 255, 128] # Light yellow
+    # Get max activity from the working SUV volume
+    roi_suv_values = working_suv_volume[working_reference_mask]
+    max_activity = np.max(roi_suv_values) if roi_suv_values.size > 0 else 0
+    print(f"Max activity in ROI: {max_activity:.3f} Bq·mL")
+    
+    # Create activity thresholds in 5000 Bq·mL steps (skip 0-5000, then 5000-10000, 10000-15000, etc)
+    activity_thresholds_bqml = []
+    current_activity = 5000  # Start at 5000 Bq·mL
+    while current_activity <= max_activity:
+        activity_thresholds_bqml.append(current_activity)
+        current_activity += 5000
+    
+    if not activity_thresholds_bqml:
+        activity_thresholds_bqml = [5000]  # Fallback: at least one threshold
+    
+    print(f"Activity thresholds (Bq·mL): {activity_thresholds_bqml}")
+    
+    # Create structures for each activity threshold
+    activity_colors = {
+        5000: [255, 0, 0],      # Red
+        10000: [255, 128, 0],   # Orange
+        15000: [255, 255, 0],   # Yellow
+        20000: [128, 255, 0],   # Light green
+        25000: [0, 255, 0],     # Green
+        30000: [0, 255, 128],   # Cyan-green
+        35000: [0, 255, 255],   # Cyan
     }
     
-    for threshold, data in threshold_structures.items():
-        struct_name = f"{reference_structure_name}_{threshold}pct"
+    threshold_structures = {}
+    for threshold_activity in activity_thresholds_bqml:
+        # Create mask for voxels >= this activity threshold
+        if np.any(working_reference_mask):
+            mask = working_reference_mask & (working_suv_volume >= threshold_activity)
+            mask = find_largest_connected_component(mask)
+            
+            volume_ml = np.sum(mask) * voxel_volume_ml
+            if volume_ml >= 0.1 and np.any(mask):
+                roi_suv = working_suv_volume[mask]
+                stats = {
+                    'volume_ml': volume_ml,
+                    'voxel_count': np.sum(mask),
+                    'suv_mean': np.mean(roi_suv),
+                    'suv_max': np.max(roi_suv),
+                    'suv_min': np.min(roi_suv),
+                    'threshold_activity_bqml': threshold_activity
+                }
+                threshold_structures[threshold_activity] = {'mask': mask, 'stats': stats}
+                print(f"Created {threshold_activity}Bq·mL structure: {volume_ml:.3f} mL")
+    
+    for threshold_activity, data in threshold_structures.items():
+        struct_name = f"{reference_structure_name}_{threshold_activity}BqmL"
+        color = activity_colors.get(threshold_activity, [128, 128, 128])  # Gray fallback
         new_structures[struct_name] = {
             'mask': data['mask'],
-            'color': threshold_colors[threshold],
+            'color': color,
             'stats': data['stats']
         }
     
@@ -594,9 +631,12 @@ def print_structure_summary(new_structures):
 
 def add_structure_generation_to_pvh(resampled_pet, structure_masks, structures, 
                                     ct_datasets, reference_structure_name,
-                                    voxel_volume_ml=1.0, voxel_spacing_mm=[1.0, 1.0, 1.0], secondPatient=False):
+                                    voxel_volume_ml=1.0, voxel_spacing_mm=[1.0, 1.0, 1.0], secondPatient=False, write_to_dicom=True):
     """
     Fixed version with better error handling and debugging
+    
+    Parameters:
+    - write_to_dicom: If False, skip writing to DICOM file (useful when generating structures in a loop)
     """
     try:
         print("\n" + "="*60)
@@ -629,8 +669,8 @@ def add_structure_generation_to_pvh(resampled_pet, structure_masks, structures,
         export_structure_stats_csv(new_structures, stats_path)
         print(f"📊 Structure statistics exported to: {stats_path}")
         
-        # Only attempt RT Structure Set creation if we have CT datasets
-        if ct_datasets and len(ct_datasets) > 0:
+        # Only attempt RT Structure Set creation if we have CT datasets AND write_to_dicom is True
+        if write_to_dicom and ct_datasets and len(ct_datasets) > 0:
             try:
                 # Write to RT Structure Set
                 output_rs_path = os.path.join(output_dir, "Generated_PET_Structures.dcm")
@@ -783,9 +823,9 @@ def export_structure_stats_csv(new_structures, output_path):
             color = struct_data['color']
             
             # Determine structure type
-            if 'pct' in struct_name.lower():
-                struct_type = "SUV_Threshold"
-                additional_info = f"{stats.get('threshold_percent', 'N/A')}% of max"
+            if 'bqml' in struct_name.lower():
+                struct_type = "Activity_Threshold"
+                additional_info = f"{stats.get('threshold_activity_bqml', 'N/A')} Bq·mL"
             elif 'edge' in struct_name.lower():
                 struct_type = "Edge_Region"
                 additional_info = f"Erosion: {stats.get('erosion_mm', 'N/A')}mm"

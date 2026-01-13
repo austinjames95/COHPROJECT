@@ -482,4 +482,4 @@ def plotting_comparison():
 
 if __name__ == "__main__":
     main()
-    #plotting_comparison()
+    plotting_comparison()
